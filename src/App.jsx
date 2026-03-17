@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MoreVertical, FileText, X, Upload } from 'lucide-react';
+import { MoreVertical, FileText, X, Upload, Settings } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 
@@ -17,9 +17,18 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [jobId, setJobId] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
 
   const fileInputRef = useRef(null);
   const pollingIntervalRef = useRef(null);
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem('paddleOcrToken');
+    if (savedToken) {
+      setTokenInput(savedToken);
+    }
+  }, []);
 
   // Status message rotation
   useEffect(() => {
@@ -44,6 +53,14 @@ function App() {
   const startConversion = async () => {
     if (!file) return;
 
+    const token = localStorage.getItem('paddleOcrToken');
+    if (!token) {
+      setErrorMsg('Please enter your PaddleOCR API Token in Settings first.');
+      setStatus('error');
+      setShowSettings(true);
+      return;
+    }
+
     setStatus('uploading');
     setProgress(10); // initial progress
 
@@ -59,6 +76,9 @@ function App() {
 
       const response = await fetch('/api/ocr', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
 
@@ -86,9 +106,14 @@ function App() {
   };
 
   const pollJobStatus = (id) => {
+    const token = localStorage.getItem('paddleOcrToken');
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        const response = await fetch(`/api/ocr/${id}`);
+        const response = await fetch(`/api/ocr/${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
 
         if (!response.ok) {
           throw new Error('Failed to fetch job status');
@@ -211,10 +236,51 @@ function App() {
           </div>
           <span className="font-bold text-lg tracking-tight">PDFConvert</span>
         </div>
-        <button className="text-slate-400 hover:text-slate-600 transition-colors">
-          <MoreVertical className="h-6 w-6" />
+        <button
+          onClick={() => setShowSettings(true)}
+          className="text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <Settings className="h-6 w-6" />
         </button>
       </header>
+
+      {showSettings && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative animate-pulse-soft" style={{ animation: 'none' }}>
+            <button
+              onClick={() => setShowSettings(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <h3 className="text-lg font-bold text-slate-800 mb-4">Settings</h3>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-600 mb-2">
+                PaddleOCR API Token
+              </label>
+              <input
+                type="text"
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                placeholder="Enter your token..."
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+              />
+              <p className="text-xs text-slate-400 mt-2">
+                Your token is stored locally in your browser.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.setItem('paddleOcrToken', tokenInput);
+                setShowSettings(false);
+              }}
+              className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl shadow-md hover:bg-blue-700 active:scale-[0.98] transition-all"
+            >
+              Save Token
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-grow flex flex-col items-center justify-center px-8 pb-20" data-purpose="conversion-status-container">

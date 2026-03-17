@@ -5,8 +5,7 @@ const fetch = require('node-fetch');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const TOKEN = process.env.TOKEN || "5b22176e869c7d92535505c651dd84cd016ca6c7"; // ideally from env
+const PORT = process.env.PORT || 3001;
 const JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs";
 
 // Configure multer for file uploads
@@ -35,10 +34,15 @@ app.post('/api/ocr', upload.single('file'), async (req, res) => {
       });
     }
 
+    const tokenHeader = req.headers['authorization'];
+    if (!tokenHeader) {
+      return res.status(401).json({ error: 'Missing Authorization header' });
+    }
+
     const response = await fetch(JOB_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${TOKEN}`,
+        'Authorization': tokenHeader,
         ...formData.getHeaders(),
       },
       body: formData,
@@ -64,9 +68,15 @@ app.post('/api/ocr', upload.single('file'), async (req, res) => {
 app.get('/api/ocr/:jobId', async (req, res) => {
   try {
     const { jobId } = req.params;
+    const tokenHeader = req.headers['authorization'];
+
+    if (!tokenHeader) {
+      return res.status(401).json({ error: 'Missing Authorization header' });
+    }
+
     const response = await fetch(`${JOB_URL}/${jobId}`, {
       headers: {
-        'Authorization': `Bearer ${TOKEN}`,
+        'Authorization': tokenHeader,
       },
     });
 
